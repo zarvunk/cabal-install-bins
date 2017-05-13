@@ -27,6 +27,8 @@ main = do
 
     let distDirPrefix =
             optDistDirPrefix
+        bindir =
+            optBindir
 
     (plan, projectRoot) <-
         case optProjectRoot of
@@ -39,11 +41,6 @@ main = do
                 findAndDecodePlanJson
 
     let targets = readExeTargets optTargets
-
-    bindir <- maybe
-                  getConfiguredBindir
-                  return
-                  optBindir
 
     let localPackages = Map.elems $
             Map.filter ((== UnitTypeLocal) . uType) (pjUnits plan)
@@ -83,15 +80,11 @@ readExeTargets =
             then (packageName, Nothing)
             else (packageName, Just rest))
 
-getConfiguredBindir :: IO FilePath
-getConfiguredBindir =
-    die $ "Haven't yet figured out how to get the configured bindir.\n"
-       ++ "For now you have to tell me via the `--bindir` flag."
 
 data Options = Options
         { optTargets :: [Text]
         , optProjectRoot :: Maybe FilePath
-        , optBindir :: Maybe FilePath
+        , optBindir :: FilePath
         , optDistDirPrefix :: String
         }
 
@@ -118,11 +111,10 @@ getOptions = customExecParser (prefs showHelpOnError) $
             <> help "path to the root directory of the cabal project (optional unless you're not in a subdirectory)"
             <> value Nothing
             )
-        <*> option (Just <$> str)
+        <*> strOption
             (  long "bindir"
             <> metavar "DIRECTORY"
-            <> help "where to put the executables"
-            <> value Nothing
+            <> help "the directory to install the executables into"
             )
         <*> strOption
             (  long "distdir"
