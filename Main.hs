@@ -29,6 +29,8 @@ main = do
             optDistDirPrefix
         bindir =
             optBindir
+        targets =
+            readExeTargets optTargets
 
     (plan, projectRoot) <-
         case optProjectRoot of
@@ -40,13 +42,12 @@ main = do
             Nothing ->
                 findAndDecodePlanJson
 
-    let targets = readExeTargets optTargets
-
     let localPackages = Map.elems $
             Map.filter ((== UnitTypeLocal) . uType) (pjUnits plan)
         targetBinFiles = mapMaybe ciBinFile $
             targetedExeComponents targets localPackages
-    for_ targetBinFiles $ \bin -> copyFileWithMetadata bin (replaceDirectory bin bindir)
+    for_ targetBinFiles $ \bin ->
+        copyFileWithMetadata bin (replaceDirectory bin bindir)
 
 targetedExeComponents :: [ExeTarget] -> [Unit] -> [CompInfo]
 targetedExeComponents targets units = do
