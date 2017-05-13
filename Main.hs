@@ -1,16 +1,14 @@
 {-# LANGUAGE RecordWildCards
            , NamedFieldPuns
-           , ViewPatterns #-}
+           , ViewPatterns
+           , OverloadedStrings #-}
 
 module Main where
 
 import Control.Monad ( guard )
 import Data.Foldable ( for_ )
-import Data.Function ( on )
-import Data.List ( groupBy )
 import Data.Maybe ( maybe, mapMaybe )
 import Data.Monoid ((<>))
-import System.Exit ( die )
 
 import qualified Data.Map as Map
 import Data.Text ( Text )
@@ -51,36 +49,45 @@ main = do
 
 targetedExeComponents :: [ExeTarget] -> [Unit] -> [CompInfo]
 targetedExeComponents targets units = do
-    target@ExeTarget{exeNames} <- targets
-    unit@Unit{uComps}          <- units
+    target@ExeTarget{exe} <- targets
+    unit@Unit{uComps}         <- units
     guard $ packageName unit == packageName target
-    mapMaybe (\exeName -> Map.lookup (CompNameExe exeName) uComps) exeNames
+    case exe of
+        Specific exeName ->
+          maybe [] return $
+            Map.lookup (CompNameExe exeName) uComps
+        All ->
+          Map.elems $
+            Map.filterWithKey isExeComponent uComps
+  where
+    isExeComponent :: CompName -> CompInfo -> Bool
+    isExeComponent (CompNameExe _) _ = True
+    isExeComponent _               _ = False
 
 data ExeTarget = ExeTarget
-        { pkgName :: PkgName
-        , exeNames :: [Text]
+        { pkg :: PkgName
+        , exe :: Exe
         }
+
+data Exe = Specific Text | All
 
 class HasPackageName a where
     packageName :: a -> PkgName
 
 instance HasPackageName ExeTarget where
-    packageName = pkgName
+    packageName = pkg
 
 instance HasPackageName Unit where
     packageName Unit{uPId = PkgId name _} = name
 
 readExeTargets :: [Text] -> [ExeTarget]
 readExeTargets =
-    map (\targets -> ExeTarget (fst $ head targets) (mapMaybe snd targets))
-  . groupBy ((==) `on` fst)
-  . map (\targetString ->
+    map $ \targetString ->
         let (PkgName -> packageName, Text.tail -> rest) =
                 Text.span (/= ':') targetString
-         in if Text.null rest
-            then (packageName, Nothing)
-            else (packageName, Just rest))
-
+         in if rest == "*"
+            then ExeTarget packageName All
+            else ExeTarget packageName (Specific rest)
 
 data Options = Options
         { optTargets :: [Text]
@@ -103,8 +110,8 @@ getOptions = customExecParser (prefs showHelpOnError) $
     parser =
       Options
         <$> some ( argument (Text.pack <$> str)
-            (  metavar "TARGET"
-            <> help "targets of the form pkgname:exename, or just pkgname for all executables in the package"
+            (  metavar "TARGETS"
+            <> help "targets of the form pkg:exe, or pkg:* for all executables in the package"
             ) )
         <*> option (Just <$> str)
             (  long "project-root"

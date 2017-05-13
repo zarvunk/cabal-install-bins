@@ -19,6 +19,7 @@ executable cabal-install-bins
   other-extensions:    RecordWildCards
                      , NamedFieldPuns
                      , ViewPatterns
+                     , OverloadedStrings
   build-depends:       base >=4.8 && <5
                      , containers >=0.5
                      , cabal-plan
